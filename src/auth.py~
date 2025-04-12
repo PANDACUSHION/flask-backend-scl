@@ -1,0 +1,102 @@
+import traceback
+from functools import wraps
+import uuid
+from datetime import datetime
+from flask import g, request, jsonify
+from jwt import JWT
+from jwt.jwk import OctetJWK
+from jwt.exceptions import JWTException
+from .db.models import Teacher
+from .config import Config
+
+# JWT setup
+secret = Config.SECRET_KEY
+signing_key = OctetJWK(secret.encode())
+jwt_instance = JWT()
+
+
+class JWTError(Exception):
+    pass
+
+
+def auth_required(roles=None):
+    def decorator(f):
+        @wraps(f)
+        def wrapper(*args, **kwargs):
+            # Get token from Authorization header
+            auth_header = request.headers.get('Authorization')
+            if not auth_header or not auth_header.startswith('Bearer '):
+                return jsonify({
+                    'error': 'Unauthorized',
+                    'message': 'Authorization header missing or invalid'
+                }), 401
+
+            try:
+                # Extract and verify token
+                token = auth_header.split()[1]
+                payload = jwt_instance.decode(token, signing_key)
+
+                # Validate payload structure
+                required_fields = {'user_id', 'role'}
+                if not required_fields.issubset(payload.keys()):
+                    raise JWTError('Token missing required fields')
+
+                # Check expiration
+                if 'exp' in payload:
+                    try:
+                        exp_timestamp = float(payload['exp'])
+                        if datetime.utcnow().timestamp() > exp_timestamp:
+                            raise JWTError('Token has expired')
+                    except (TypeError, ValueError):
+                        raise JWTError('Invalid expiration format')
+
+                # Convert and validate user_id
+                try:
+                    user_id = uuid.UUID(payload['user_id'])
+                except (ValueError, AttributeError) as e:
+                    raise JWTError(f'Invalid user ID format: {str(e)}')
+
+                # Fetch user from database
+                user = Teacher.query.filter_by(id=user_id).first()
+                if not user:
+                    raise JWTError('User not found')
+
+                # Check role authorization
+                if roles and user.role.lower() not in [r.lower() for r in roles]:
+                    return jsonify({
+                        'error': 'Forbidden',
+                        'message': 'Insufficient permissions'
+                    }), 403
+
+                # Store user and payload in Flask's g object
+                g.current_user = user
+                g.jwt_payload = payload
+                return f(*args, **kwargs)
+
+            except JWTError as e:
+                return jsonify({
+                    'error': 'Authentication failed',
+                    'message': str(e)
+                }), 401
+            except JWTException as e:
+                return jsonify({
+                    'error': 'Invalid token',
+                    'message': 'Token verification failed'
+                }), 401
+            except Exception as e:
+                return jsonify({
+                    'error': 'Authentication error',
+                    'message': 'An unexpected error occurred'
+                }), 500
+
+        return wrapper
+
+    return decorator
+
+
+def teacher_required(f):
+    return auth_required(roles=['teacher'])(f)
+
+
+def student_required(f):
+    return auth_required(roles=['student'])(f)

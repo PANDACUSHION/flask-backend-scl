@@ -1,0 +1,102 @@
+from datetime import datetime
+from typing import List, Optional
+from uuid import UUID, uuid4
+from .db import db
+from sqlalchemy import ForeignKey, String, TIMESTAMP, Numeric, Table, Column, Boolean
+from sqlalchemy.orm import Mapped, mapped_column, relationship
+from sqlalchemy.dialects.postgresql import UUID as PG_UUID
+from sqlalchemy.sql import func
+
+# Association table for many-to-many relationship between Student and Class
+student_class_association = Table(
+    'student_class_association',
+    db.Model.metadata,
+    Column('student_id', PG_UUID(as_uuid=True), ForeignKey('students.id'), primary_key=True),
+    Column('class_id', PG_UUID(as_uuid=True), ForeignKey('classes.id'), primary_key=True)
+)
+
+
+class Teacher(db.Model):
+    __tablename__ = "teachers"
+
+    first_name: Mapped[str] = mapped_column(String(50), nullable=False)
+    last_name: Mapped[str] = mapped_column(String(50), nullable=False)
+    email: Mapped[str] = mapped_column(String(50), unique=True, nullable=False)
+    password_hash: Mapped[str] = mapped_column(String(100), nullable=False)
+    role: Mapped[str] = mapped_column(String(50), nullable=False, default="teacher")
+    id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), primary_key=True, default=uuid4)
+    created_at: Mapped[datetime] = mapped_column(TIMESTAMP(timezone=True), server_default=func.now(), init=False)
+
+    classes: Mapped[List["Classroom"]] = relationship("Classroom", back_populates="teacher", init=False)
+    students: Mapped[List["Student"]] = relationship("Student", back_populates="teacher", init=False)
+
+
+class Student(db.Model):
+    __tablename__ = "students"
+    first_name: Mapped[str] = mapped_column(String(50), nullable=False)
+    last_name: Mapped[str] = mapped_column(String(50), nullable=False)
+    email: Mapped[str] = mapped_column(String(50), unique=True, nullable=False)
+    password_hash: Mapped[str] = mapped_column(String(100), nullable=False)
+    teacher_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), ForeignKey("teachers.id"), nullable=False)
+    role: Mapped[str] = mapped_column(String(50), nullable=False, default="student")
+    id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), primary_key=True, default=uuid4)
+    created_at: Mapped[datetime] = mapped_column(TIMESTAMP(timezone=True), server_default=func.now(), init=False)
+
+    teacher: Mapped["Teacher"] = relationship("Teacher", back_populates="students", init=False)
+    classes: Mapped[List["Classroom"]] = relationship(
+        "Classroom",
+        secondary=student_class_association,
+        back_populates="students",
+        init=False
+    )
+
+
+class Classroom(db.Model):
+    __tablename__ = "classes"
+
+    teacher_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), ForeignKey("teachers.id"), nullable=False)
+    image: Mapped[str] = mapped_column(String(100), nullable=False)
+    name: Mapped[str] = mapped_column(String(50), nullable=False)
+    description: Mapped[str] = mapped_column(String(100), nullable=False)
+    id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), primary_key=True, default=uuid4)
+    created_at: Mapped[datetime] = mapped_column(TIMESTAMP(timezone=True), server_default=func.now(), init=False)
+
+    teacher: Mapped["Teacher"] = relationship("Teacher", back_populates="classes", init=False)
+    students: Mapped[List["Student"]] = relationship(
+        "Student",
+        secondary=student_class_association,
+        back_populates="classes",
+        init=False
+    )
+    sessions: Mapped[List["Session"]] = relationship("Session", back_populates="class_obj", init=False)
+
+
+class Session(db.Model):
+    __tablename__ = "sessions"
+
+    session_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True))
+    class_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), ForeignKey("classes.id"), nullable=False)
+    id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), primary_key=True, default=uuid4)
+    status: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    created_at: Mapped[datetime] = mapped_column(TIMESTAMP(timezone=True), server_default=func.now(), init=False)
+    class_started_at: Mapped[datetime] = mapped_column(TIMESTAMP(timezone=True), server_default=func.now(), init=False)
+
+    class_obj: Mapped["Classroom"] = relationship("Classroom", back_populates="sessions", init=False)
+    behaviours: Mapped[List["Behaviour"]] = relationship("Behaviour", back_populates="session", init=False)
+
+
+class Behaviour(db.Model):
+    __tablename__ = "behaviours"
+
+    session_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), ForeignKey("sessions.id"), nullable=False)
+    behaviour: Mapped[str] = mapped_column(String(50), nullable=False)
+    x_axis: Mapped[int] = mapped_column(Numeric, nullable=False)
+    y_axis: Mapped[int] = mapped_column(Numeric, nullable=False)
+    w_axis: Mapped[int] = mapped_column(Numeric, nullable=False)
+    h_axis: Mapped[int] = mapped_column(Numeric, nullable=False)
+    confidence: Mapped[float] = mapped_column(Numeric, nullable=False)
+    image: Mapped[str] = mapped_column(String(100), nullable=False)
+    id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), primary_key=True, default=uuid4)
+    created_at: Mapped[datetime] = mapped_column(TIMESTAMP(timezone=True), server_default=func.now(), init=False)
+
+    session: Mapped["Session"] = relationship("Session", back_populates="behaviours", init=False)
