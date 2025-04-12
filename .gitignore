@@ -1,0 +1,5 @@
+src/static/uploads/*
+
+node_modules/*
+
+.venv

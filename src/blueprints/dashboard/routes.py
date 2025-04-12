@@ -224,7 +224,6 @@ def get_teacher_classes():
 
     class_data = []
     for class_obj in classes:
-        # Check if there's an active session for this class
         active_session = Session.query.filter_by(
             class_id=class_obj.id,
             status=True

@@ -1,6 +1,6 @@
 from datetime import datetime, timedelta
 
-from flask import Blueprint, Flask, jsonify, g
+from flask import Blueprint, Flask, jsonify, g, url_for
 from sqlalchemy import func
 
 from src.auth import teacher_required
@@ -233,7 +233,6 @@ def get_teacher_classes():
         class_data.append({
             'id': class_obj.id,
             'name': class_obj.name,
-            'image': class_obj.image,
             'image': url_for('static', filename=f'uploads/{class_obj.image}'),
             'description': class_obj.description,
             'has_active_session': active_session is not None,
