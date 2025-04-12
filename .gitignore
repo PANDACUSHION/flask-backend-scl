@@ -1,4 +1,9 @@
-src/static/uploads/*
+src/static/uploads/*.[pP][nN][gG]
+src/static/uploads/*.[jJ][pP][gG]
+src/static/uploads/*.[jJ][pP][eE][gG]
+src/static/uploads/*.[gG][iI][fF]
+src/static/uploads/*.[wW][eE][bB][pP]
+src/static/uploads/*.[sS][vV][gG]
 node_modules/
 venv/
 .env
