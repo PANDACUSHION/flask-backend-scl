@@ -132,7 +132,6 @@ def get_session_stats(session_id):
     if g.current_user.role != "teacher" and g.current_user.role != "admin":
         return jsonify({'message': 'Unauthorized'}), 401
     try:
-        # Get basic session info
         session = db.session.query(Session).filter(Session.id == session_id).first()
         if not session:
             return jsonify({'message': 'Session not found'}), 404

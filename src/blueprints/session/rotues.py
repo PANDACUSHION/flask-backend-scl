@@ -160,7 +160,7 @@ def get_session_stats(session_id):
 
 
 @bp.route('/stats/classroom/<string:class_id>/sessions', methods=['GET'])
-@teacher_required
+@auth_required()
 def get_classroom_sessions_stats(class_id):
     try:
         classroom = db.session.query(Classroom).filter(Classroom.id == class_id).first()

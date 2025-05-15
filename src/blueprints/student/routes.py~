@@ -8,7 +8,7 @@ from ..teacher.routes import generate_token
 from flask import Blueprint, request, jsonify, g, url_for
 from ...db import db
 from ...db.models import Student, Teacher, Classroom, student_class_association, Session
-from ...auth import teacher_required, student_required
+from ...auth import teacher_required, student_required, auth_required
 from ...utils.uploads import generate_strong_password
 bp = Blueprint('student', __name__, url_prefix='/student')
 
@@ -200,7 +200,7 @@ def get_teacher_courses():
         return jsonify({'error': 'An error occurred', 'message': str(e)}), 500
 
 @bp.route('/classes/<string:classroom_id>', methods=['GET'])
-@teacher_required
+@auth_required(roles=['teacher', 'student'])
 def get_class(classroom_id):
     classroom = Classroom.query.get(classroom_id)
     if not classroom:
@@ -211,7 +211,7 @@ def get_class(classroom_id):
         'name': classroom.name,
         'description': classroom.description,
         'created_at': classroom.created_at,
-        'image': url_for('static', filename=f'uploads/{classroom.image')'}
+        'image': url_for('static', filename=f'uploads/{classroom.image}')
     }), 200
 
 
