@@ -3,34 +3,39 @@ from datetime import datetime, timedelta
 from flask import Blueprint, Flask, jsonify, g, url_for
 from sqlalchemy import func
 
-from src.auth import teacher_required
+from src.auth import teacher_required, auth_required
 from src.db import db
 from src.db.models import Classroom, Student, Session, Behaviour
 
 bp = Blueprint('dashboard', __name__, url_prefix='/dashboard')
 
 @bp.route('/stats', methods=['GET'])
-@teacher_required
+@auth_required
 def dashboard_stats():
-    teacher_id = g.current_user.id
-    # Total Classes
-    total_classes = Classroom.query.filter_by(teacher_id=teacher_id).count()
+    role = g.current_user.role
 
-    # Total Students
-    total_students = Student.query.filter_by(teacher_id=teacher_id).count()
-
-    # Active Sessions (status=True)
-    active_sessions = Session.query.join(Classroom)\
-        .filter(Classroom.teacher_id == teacher_id, Session.status == True)\
-        .count()
-
-    # Recent Behaviors (last 24 hours)
-    recent_behaviors = Behaviour.query.join(Session).join(Classroom)\
-        .filter(
-            Classroom.teacher_id == teacher_id,
+    if role == "admin":
+        # Admin: Global stats
+        total_classes = Classroom.query.count()
+        total_students = Student.query.count()
+        active_sessions = Session.query.filter_by(status=True).count()
+        recent_behaviors = Behaviour.query.filter(
             Behaviour.created_at >= datetime.utcnow() - timedelta(hours=24)
-        )\
-        .count()
+        ).count()
+    else:
+        # Teacher: Personal stats
+        teacher_id = g.current_user.id
+
+        total_classes = Classroom.query.filter_by(teacher_id=teacher_id).count()
+        total_students = Student.query.filter_by(teacher_id=teacher_id).count()
+        active_sessions = Session.query.join(Classroom)\
+            .filter(Classroom.teacher_id == teacher_id, Session.status == True)\
+            .count()
+        recent_behaviors = Behaviour.query.join(Session).join(Classroom)\
+            .filter(
+                Classroom.teacher_id == teacher_id,
+                Behaviour.created_at >= datetime.utcnow() - timedelta(hours=24)
+            ).count()
 
     return jsonify({
         "total_classes": total_classes,
@@ -224,7 +229,6 @@ def get_teacher_classes():
 
     class_data = []
     for class_obj in classes:
-        # Check if there's an active session for this class
         active_session = Session.query.filter_by(
             class_id=class_obj.id,
             status=True

@@ -8,8 +8,7 @@ from werkzeug.utils import secure_filename
 from ...config import Config
 from ...db import db
 from ...db.models import Session, Behaviour, Classroom
-from ...auth import teacher_required
-
+from ...auth import teacher_required, auth_required
 
 bp = Blueprint('session', __name__, url_prefix='/session')
 
@@ -128,11 +127,11 @@ def create_detection(session_id):
         return jsonify({'error': f'Internal server error: {str(e)}'}), 500
 
 @bp.route('/stats/session/<string:session_id>', methods=['GET'])
-@teacher_required
+@auth_required()
 def get_session_stats(session_id):
-    """Get behavior statistics for a specific session"""
+    if g.current_user.role != "teacher" and g.current_user.role != "admin":
+        return jsonify({'message': 'Unauthorized'}), 401
     try:
-        # Get basic session info
         session = db.session.query(Session).filter(Session.id == session_id).first()
         if not session:
             return jsonify({'message': 'Session not found'}), 404
